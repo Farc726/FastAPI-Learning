@@ -9,35 +9,38 @@ async def get_app():
 
 # 1.路径参数
 # 在请求路径部分{}定义路径参数
-# 在处理函数部分写同名的函数形参 并做好类型注解
+# 在处理函数部分写**同名**的函数形参 并做好类型注解
 # 在函数体的响应部分即可使用传入的路径参数
 
-# 1.1类型注解（python 原生注解就是：int，若想额外加信息）
+# 1.1类型注解
+# python标准类型
 # 导入使用Path函数
-# 原生注解基础之上“=”赋值为 Path函数  小括号里面写参数 description="添加描述"
+
+# 注意先后顺序详见笔记
+@app.get("/user/password")
+async def user_password():
+    return {"password":"无权限不可随意查看"}
+
 @app.get("/user/{id}")
 async def get_user(id:int=Path(...,gt=0,le=100,description="请输入1~100之间的数字")):
     return {"id":id,"title":f"欢迎您第{id}号用户"}
 
-@app.get("/user/hello/{name}")
-async def get_user_name(name:str=Path(...,min_length=2,max_length=10,description="请输入用户名2~10个字符~")):
-    return {"name":name,"word":f"欢迎用户{name}使用本app"}
 
 
-#2.查询参数
+#2.查询参数（？后）
 # 示例：需求：设计接口查询图书，要求携带两个查询参数：图书分类和价格
 # 参数具体要求：
 # 图书分类：默认值为 Python 开发，长度限制 5 ~ 255
 # 价格：限制大小范围 50 ~ 100
 @app.get("/library/book")
-# 1.导入Query
+# 1.python标准类型    2.导入Query
 # 原生注解基础之上“=”赋值为 Query函数  
 # 可以有默认值 取代...的位置即可
 async def get_book(category:str=Query("Python开发",min_length=5,max_length=255),price:float=Query(ge=50,le=100)):
     return {"类别:":category,"价格":price}
 
 
-# 3.请求体参数
+# 3.请求体参数（具体见笔记 -- 向后学多了之后会有更深的理解）
 # 定义类型
 # 类型注解
 # 导入pydantic中的 Field函数--类型注解
