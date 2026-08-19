@@ -1,7 +1,7 @@
 from fastapi import FastAPI,HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel,ConfigDict
 
 app=FastAPI()
 
@@ -40,7 +40,10 @@ async def get_item(item:Item):
 # 5.返回自定义的类
 class PetOut(BaseModel):
     name:str
-    age:int
+    age:int   
+# PetOut 想从 Pet 对象的属性（self.name、self.age）里取数据，必须告诉 Pydantic 允许读属性
+#from_attributes=True 作用：允许 Pydantic 读取普通对象的属性，不止接收字典
+    model_config=ConfigDict(from_attributes=True)
 
 class Pet():
     def __init__(self,name,age,price):
