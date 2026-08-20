@@ -1,3 +1,4 @@
+#8.20 重写的时候 一个很大的问题是 return的是哪一个对象 一定要注意 一般不是请求体中的对象 你先看逻辑再看可否过滤
 from fastapi import FastAPI,HTTPException,Path
 from pydantic import BaseModel,Field,EmailStr,ConfigDict
 
@@ -36,7 +37,7 @@ next_id=1
 async def create_member(member:MemberCreate):
 # 声明全局对象next_id
     global next_id
-#将MemberCreate对象转为字典
+#将MemberCreate对象转为字典(这里其实不用转字典 直接按类访问就可以--类似于后面登录校验时)
     new_member_dict=member.model_dump()
     for old_member in Member_List:
         if old_member.username==new_member_dict["username"]:
