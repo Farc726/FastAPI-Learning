@@ -9,6 +9,9 @@ app=FastAPI()
 # 这里你会产生的一个小疑问 -- 关于.png和.jpg
 # 底层真相：wb只负责把字节一股脑写进磁盘，它根本不懂图片格式，不会校验、不会转换格式。（上传于后缀不匹配有可能显示不出）
 @app.post("/files")
+# 二次重写时写成了file: File错了------ File是一个声明函数 并非类型注解
+# 类型是 bytes，File() 是默认值 --告诉FastAPI 这个参数来自 multipart/form‑data 请求体的文件表单，而不是 URL 查询参数
+# 这又可以补充参数类型的判断方式 具体见笔记
 async def upload_1(file:bytes=File(...)):
     with open("../file/01.png","wb") as f:
         f.write(file)
