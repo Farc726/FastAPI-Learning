@@ -1,13 +1,13 @@
-#导入方法
+#1.导入方法
 from sqlalchemy import create_engine,Column,Integer,String
 from sqlalchemy.orm import Session,DeclarativeBase
-# 创建引擎（建立程序与数据库之间的连接）
+#2. 创建引擎（建立程序与数据库之间的连接）
 engine=create_engine("sqlite:///school_orm.db")
 # ORM方法核心
-# 创建继承于。。。的基类 这样后续的具体模型类才会被翻译为SQL语句
+# 3.基类：创建继承于。。。的基类 这样后续的具体模型类才会被翻译为SQL语句
 class Base(DeclarativeBase):
     pass
-# 创建基于基类的模型类
+# 4.模型类：创建基于基类的模型类
 class Student(Base):
     __tablename__="students"
     id=Column(Integer,primary_key=True,autoincrement=True)
@@ -16,9 +16,9 @@ class Student(Base):
     math = Column(Integer)
     english = Column(Integer)
     
-# 先在数据库中建表
+# 5.建表：先在数据库中建表
 Base.metadata.create_all(engine)
-##要进行各种方法地实施了
+##6.方法实施：要进行各种方法地实施了
 # 首先打开有着各种方法的窗口
 session=Session(engine)
 # 进行各种方法实施
