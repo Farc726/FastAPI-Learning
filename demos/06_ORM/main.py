@@ -7,6 +7,7 @@ import sqlalchemy
 import datetime
 from sqlalchemy.orm import DeclarativeBase,Mapped,mapped_column
 from sqlalchemy import select
+from pydantic import BaseModel
 
 #SQLite 异步连接串写法：sqlit+aiosqlite（SQLite的异步驱动包）:数据库文件名
 ASYNC_DATABASE_URL="sqlite+aiosqlite:///test1.db"
@@ -70,9 +71,20 @@ async def get_db():
         yield session
 
             
-@app.get("/book/books")
-async def get_book_list(db:AsyncSession=Depends(get_db)):
-    #查询：
-    result=await db.execute(sqlalchemy.select(Book))
-    book=result.scalars().all()
+
+
+#需求：用户输入图书信息（id 书名 作者 价格 出版社）
+# 用户输入->参数->请求体参数
+class  BookBase(BaseModel):
+    id:int
+    bookname:str
+    author:str
+    price:float
+    publisher:str
+@app.post("/book/book_add")
+async def add_book(book:BookBase,db:AsyncSession=Depends(get_db)):
+    # ORM对象 ---add---commit
+    book_obj=Book(**book.__dict__)   
+    db.add(book_obj)
+    await db.commit()
     return book
