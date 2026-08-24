@@ -1,11 +1,12 @@
 # 创建数据库引擎
 # 使用create_async_engine创建异步引擎
-from fastapi import FastAPI
+from fastapi import FastAPI,Depends
 app=FastAPI()
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import create_async_engine,async_sessionmaker, AsyncSession
 import sqlalchemy
 import datetime
 from sqlalchemy.orm import DeclarativeBase,Mapped,mapped_column
+from sqlalchemy import select
 
 #SQLite 异步连接串写法：sqlit+aiosqlite（SQLite的异步驱动包）:数据库文件名
 ASYNC_DATABASE_URL="sqlite+aiosqlite:///test1.db"
@@ -55,3 +56,23 @@ async def startup_event():
 @app.get("/")
 async def root():
     return {"message":"welcome!"}
+
+#需求：查询功能的接口，查询图书 依赖注入：创建依赖项获取数据库会话+Depends 注入路由处理函数
+AsyncSessionLocal=async_sessionmaker(
+    bind=async_engine,#绑定数据库引擎
+    class_=AsyncSession,#指定会话类
+    expire_on_commit=False#提交后会话不过期 不会重新查询数据库
+)
+
+# 依赖项
+async def get_db():
+    async with AsyncSessionLocal() as session:
+        yield session
+
+            
+@app.get("/book/books")
+async def get_book_list(db:AsyncSession=Depends(get_db)):
+    #查询：
+    result=await db.execute(sqlalchemy.select(Book))
+    book=result.scalars().all()
+    return book
