@@ -37,13 +37,13 @@ class Member(Base):
     __tablename__="member"
     id=Column(Integer,primary_key=True,autoincrement=True)
     username=Column(String)
-    email = Column(String(255), unique=True, nullable=False)
+    email = Column(String(255), nullable=False)
     password=Column(String)
     
 # 创建引擎 与数据库建立连接
 engine=create_engine("sqlite:///vip.db")
 # 建表
-Base.metadata.create_all(Member)
+Base.metadata.create_all(engine)
 
 app=FastAPI()
 
@@ -52,11 +52,15 @@ app=FastAPI()
 @app.post("/members",response_model=MemberOut)
 def create_member(member:MemberCreate):
     with Session(engine) as session:
+        #添加查重操作
+        exists=session.query(Member).filter(Member.username==member.username).first()
+        if exists:
+            return HTTPException(400,detail="该用户名已存在~")
         new_member=Member(**member.model_dump())
         session.add(new_member)
         session.commit()
         session.refresh(new_member)
-        return member
+        return new_member
 
 #操作二：
 #查询全部会员
@@ -70,11 +74,12 @@ def get_members():
 
 #操作三：
 #查询单个人
-@app.get("/members/get{id}",response_model=MemberOut)
+@app.get("/members/get/{id}",response_model=MemberOut)
 def get_member(id:int):
     with Session(engine) as session:
         member=session.query(Member).filter(Member.id==id).first()
-        return member
+        if member:
+            return member
     raise HTTPException(404,detail="未找到此用户~")
 
 #操作四：
@@ -83,9 +88,9 @@ class LoginInOut(BaseModel):
     msg:str
     member:MemberOut
     model_config=ConfigDict(from_attributes=True)
-@app.get("/members/loginin",response_model=LoginInOut)
+@app.post("/members/loginin",response_model=LoginInOut)
 def member_login(member:LoginIn):
-    with Session(Member) as session:
+    with Session(engine) as session:
         member_list=session.query(Member).all()
         for m in member_list:
             if m.username==member.username and m.password==member.password:
@@ -96,15 +101,16 @@ def member_login(member:LoginIn):
 #操作五
 #删除操作
 class DeleteMember(BaseModel):
-    usename:str=Field(...)
+    username:str=Field(...)
     
 @app.post("/members/delete")
 def delete_member(member:DeleteMember):
-    with Session(Member) as session:
-        s=session.query(Member).filter(Member.username==member.usename).first()
-        session.delete(s)
-        session.commit()
-        return {"msg":"删除成功","username":s.username}
+    with Session(engine) as session:
+        s=session.query(Member).filter(Member.username==member.username).first()
+        if s:
+            session.delete(s)
+            session.commit()
+            return {"msg":"删除成功","username":s.username}
     raise HTTPException(404,detail="删除失败 未找到此用户")
     
 
