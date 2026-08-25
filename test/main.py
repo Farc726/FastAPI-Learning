@@ -4,6 +4,13 @@
 # 同时通过同步函数与FASTapi结合 这样来完成成绩管理系统的增删改查操作
 # 今天复习我们来写宠物店vip管理系统
 
+# 注意
+# 1.关于什么时候engine做参数：
+    #1.1建表的时候：Base.metadata.create_all(engine) 告诉SQLAIchemy向哪一个数据库建表
+    #1.2建立每一个接口的时候 告诉Session用这个窗口去哪个数据库干活
+#2.请求体一般关于提交内容也就是写-一般与post结合   --登录一般用post 因为密码不可以进URL且一般认为 get无副作用不改变任何状态 而 登陆成功后 按理说是要创建会话状态的 
+
+
 # 导包
 from fastapi import FastAPI,HTTPException
 from pydantic import BaseModel,Field,EmailStr,ConfigDict
@@ -55,7 +62,7 @@ def create_member(member:MemberCreate):
         #添加查重操作
         exists=session.query(Member).filter(Member.username==member.username).first()
         if exists:
-            return HTTPException(400,detail="该用户名已存在~")
+            raise HTTPException(400,detail="该用户名已存在~")
         new_member=Member(**member.model_dump())
         session.add(new_member)
         session.commit()
