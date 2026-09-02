@@ -6,8 +6,10 @@ from sqlalchemy.orm import DeclarativeBase,Session
 import time,os
 # 用数据库加ORM的前置准备
 #加载数据库
-engine_m=create_engine("sqlite:///members.db")
-engine_p=create_engine("sqlite:///pets.db")
+#用了两个数据库（members.db + pets.db）
+#会员和宠物应该共用一个库，owner_id 才有意义。
+# 一个引擎一个文件：
+engine=create_engine("sqlite:///vip.db")
 
 # 初始化好各类
 #1.ORM相关
@@ -33,9 +35,8 @@ class Pet(Base):
     image_path=Column(String)
     owner_id=Column(Integer)
 
-# 建表
-Member.metadata.create_all(engine_m)
-Pet.metadata.create_all(engine_p)
+# 建表 用的是Base所有继承Base的模型都登记在metadata名册中 用create_all方法就是按照整本名册建表 所以在这里就是建了两个表
+Base.metadata.create_all(engine)
 
 #2.fastapi相关
 #2.1member/pet基础类
@@ -50,7 +51,7 @@ class PetBase(BaseModel):
     
     
 #2.2member/pet创建类
-class MembetCreate(MemberBase):
+class MemberCreate(MemberBase):
     password:str=Field(...,min_length=6,max_length=20)
 class PetCreate(PetBase):
     image_path:str
@@ -72,18 +73,24 @@ app=FastAPI()
 
 #会员注册功能（添加 写入）
 @app.post("/members/add",response_model=MemberOut)
-def member_create(member:MembetCreate):
-    with Session(engine_m) as session:
-        new_memebr=Member(**member)
+def member_create(member:MemberCreate):
+    with Session(engine) as session:
+        new_member=Member(**member.model_dump())
+        m=session.query(Member).filter(Member.username==member.username).first()
+        if m:
+            raise HTTPException(401,detail="系统中已有该用户名~")
+        session.add(new_member)
+        session.commit()
+        session.refresh(new_member)
+        return new_member
+#查询全部会员
+@app.get("/members/get",response_model=list[MemberOut])
+def get_members():
+    with Session(engine) as session:
         member_list=session.query(Member).all()
-        for m in member_list:
-            if(m.username==new_memebr.username):
-                raise HTTPException(401,detail="系统中已有该用户名~")
-            else:
-                session.add(new_memebr)
-                session.commit()
-                session.refresh(new_memebr)
-                return new_memebr
+        if member_list:
+            return member_list
+    raise HTTPException(404,"系统中暂无注册会员~")
     
 #会员登录功能
 class LoginIn(BaseModel):
@@ -95,7 +102,7 @@ class LoginOut(BaseModel):
     
 @app.post("/members/login",response_model=LoginOut)
 def member_login(member:LoginIn):
-    with Session(engine_m) as session:
+    with Session(engine) as session:
         member_list=session.query(Member).all()
         for m in member_list:
             if member.username==m.username and member.password==m.password:
@@ -103,7 +110,9 @@ def member_login(member:LoginIn):
         raise HTTPException(404,detail="用户名或密码错误 未找到该用户~")
     
 #添加宠物
-UPLOAD_DIR="my_project"
+UPLOAD_DIR = "uploads"
+# 关键：先创建，不存在就建
+os.makedirs(UPLOAD_DIR, exist_ok=True)  
 @app.post("/pets/add",response_model=PetOut)
 # 这个有意思 涉及表单 文件上传 文件路径 时间戳保存唯一文件名
 def get_pet(
@@ -117,11 +126,13 @@ def get_pet(
     filename=f"{int(time.time())}_{photo.filename}"
     #生成文件路径
     save_path=os.path.join(UPLOAD_DIR,filename)
-    with open (filename,"wb") as f:
+    with open (save_path,"wb") as f:
+        f.write(photo.file.read())
         if not f:
             raise HTTPException(422,detail="图片上传失败")
-    new_pet=Pet(name,kind,age,save_path,owner_id)
-    with Session(engine_p) as session:
+#SQLAlchemy 模型不支持位置参数，必须关键字：
+    new_pet=Pet(name=name,kind=kind,age=age,image_path=save_path,owner_id=owner_id)
+    with Session(engine) as session:
         if session:
             session.add(new_pet)
             session.commit()
@@ -132,18 +143,18 @@ def get_pet(
      
     
 #宠物列表
-@app.get("pets/get_pet",response_model=list[PetOut])
+@app.get("/pets/get_pet",response_model=list[PetOut])
 def get_pets():
-    with Session(engine_p) as session:
+    with Session(engine) as session:
         pet_list=session.query(Pet).all()
         if not pet_list:
             raise HTTPException(404,detail="列表中未找到任何宠物~")
         return pet_list
         
 # 查询单个宠物
-@app.get("pets/get_pet/{pet_id}",response_model=PetOut)
+@app.get("/pets/get_pet/{pet_id}",response_model=PetOut)
 def get_pet(pet_id:int):
-    with Session(Pet) as session:
+    with Session(engine) as session:
         pet_list=session.query(Pet).all()
         for p in pet_list:
             if p.id==pet_id:
@@ -162,12 +173,13 @@ def update_pet(
 ):
 # 为什么要用时间戳来保证不会相互覆盖？？？
     filename=f"{int(time.time())}_{photo.filename}"
-    save_path=os.path.join(filename)
-    with open(filename,"wb") as f:
+    save_path=os.path.join(UPLOAD_DIR,filename)
+    with open(save_path,"wb") as f:
+        f.write(photo.file.read())
         if not f:
             raise HTTPException(422,detail="文件上传失败~")
-    with Session(engine_p) as session:
-        update_pet=session.query(Pet).filter(Pet.id==pet_id)
+    with Session(engine) as session:
+        update_pet=session.query(Pet).filter(Pet.id==pet_id).first()
         if update_pet:
             update_pet.name=name
             update_pet.kind=kind
@@ -182,9 +194,9 @@ def update_pet(
         
                 
 #删除
-@app.post("pets/delete/{pet_id}")
+@app.post("/pets/delete/{pet_id}")
 def pet_delete(pet_id:int):
-    with Session(engine_p) as session:
+    with Session(engine) as session:
         delete_pet=session.query(Pet).filter(Pet.id==pet_id).first()
         if delete_pet:
             session.delete(delete_pet)
