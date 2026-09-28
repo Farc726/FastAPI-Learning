@@ -2,11 +2,10 @@
 #FastAPI 路由必须以/开头    注意要避免同名路由的存在   HTTP报错的语义要严谨
 from fastapi import FastAPI,HTTPException,UploadFile,Form,File,Depends
 from pydantic import BaseModel,Field,EmailStr,ConfigDict
-from sqlalchemy import create_engine,Integer,String,Column,Float
+from sqlalchemy import create_engine,Integer,String,Column
 from sqlalchemy.orm import DeclarativeBase,Session
 import time,os
 from datetime import datetime
-from classifier import classify
 
 #依赖函数 每次请求都会执行这个函数 少去很多重复代码
 def get_db():
@@ -47,8 +46,6 @@ class Pet(Base):
     age=Column(Integer)
     image_path=Column(String)
     owner_id=Column(Integer)
-    detect_result = Column(String)   # 识别出的类别
-    confidence = Column(Float)       # 置信度
 
 # 建表 用的是Base所有继承Base的模型都登记在metadata名册中 用create_all方法就是按照整本名册建表 所以在这里就是建了两个表
 Base.metadata.create_all(engine)
@@ -82,8 +79,6 @@ class PetOut(BaseModel):
     kind:str=Field(...)
     age:int
     image_path:str
-    detect_result: str | None = None
-    confidence: float | None = None
     model_config=ConfigDict(from_attributes=True)
     
 # 功能实现
@@ -156,9 +151,8 @@ def get_pet(
         f.write(photo.file.read())
         if not f:
             raise HTTPException(422,detail="图片上传失败")
-    detect_result, confidence = classify(save_path) 
 #SQLAlchemy 模型不支持位置参数，必须关键字：
-    new_pet=Pet(name=name,kind=kind,age=age,image_path=save_path,owner_id=owner_id,detect_result=detect_result, confidence=confidence)  
+    new_pet=Pet(name=name,kind=kind,age=age,image_path=save_path,owner_id=owner_id)
     
     if session:
         session.add(new_pet)
@@ -210,8 +204,7 @@ def update_pet(
         f.write(photo.file.read())
         if not f:
             raise HTTPException(422,detail="文件上传失败~")
-    detect_result, confidence = classify(save_path)
-    
+
     update_pet=session.query(Pet).filter(Pet.id==pet_id).first()
     if update_pet:
         update_pet.name=name
@@ -219,8 +212,6 @@ def update_pet(
         update_pet.age=age
         update_pet.image_path=save_path
         update_pet.owner_id=owner_id
-        update_pet.detect_result = detect_result             # ← 新增
-        update_pet.confidence = confidence 
         session.commit()
         session.refresh(update_pet)
         return update_pet
@@ -240,5 +231,3 @@ def pet_delete(
         session.commit()
         return {"msg":"删除成功","name":delete_pet.name}
     raise HTTPException(422,detail="删除失败,请联系管理员进行处理~")
-                
-            
